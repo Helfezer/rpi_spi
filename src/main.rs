@@ -8,6 +8,7 @@ use bsp::entry;
 use defmt::*;
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::prelude::*;
 use panic_probe as _;
 
 // Provide an alias for our BSP so we can switch targets quickly.
@@ -68,18 +69,24 @@ fn main() -> ! {
     let spi_sclk: gpio::Pin<_, gpio::FunctionSpi, gpio::PullNone> = pins.gpio2.reconfigure();
     let spi_mosi: gpio::Pin<_, gpio::FunctionSpi, gpio::PullNone> = pins.gpio3.reconfigure();
     let spi_miso: gpio::Pin<_, gpio::FunctionSpi, gpio::PullUp> = pins.gpio4.reconfigure();
-    let spi_cs = pins.gpio5.into_push_pull_output();
+    let mut spi_cs = pins.gpio5.into_push_pull_output();
 
     let spi = spi::Spi::<_, _, _, 8>::new(pac.SPI0, (spi_mosi, spi_miso, spi_sclk));
 
-    let spi = spi.init(
+    let mut spi = spi.init(
         &mut pac.RESETS,
         clocks.peripheral_clock.freq(),
         400.kHz(),
         embedded_hal::spi::MODE_0,
     );
+    spi_cs.set_high().unwrap(); // set inactif
+    delay.delay_ms(200);
 
     loop {
+        spi_cs.set_low().unwrap();
+        let mut data: [u8; 2] = [0xd0, 0x0];
+        let transfer_success = spi.transfer(&mut data);
+        spi_cs.set_high().unwrap();
         info!("on!");
         led_pin.set_high().unwrap();
         delay.delay_ms(500);
